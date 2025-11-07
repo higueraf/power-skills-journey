@@ -8,7 +8,7 @@ import { SIZES } from "../constants3d";
 export default function CompassPickupGame({ onWin }: { onWin: () => void }) {
   const [picked, setPicked] = useState(false);
   const [showHelp, setShowHelp] = useState(true);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg] = useState<string | null>(null);
   const [showWin, setShowWin] = useState(false);
  const handlePick = () => {
     if (showHelp || picked || showWin) return; // no permitir clicks antes de cerrar el modal o repetidos

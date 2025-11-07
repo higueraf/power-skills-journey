@@ -74,8 +74,7 @@ export default function ActionSelectGame({ onWin }: Props) {
   const gap = 1.6;
 
   const correctCount = items.filter((i) => i.correct).length;
-  const hasWon = selected.filter((id) => items.find((i) => i.id === id)?.correct)
-                         .length === correctCount;
+  
 
   function toggle(id: string) {
     if (showHelp || showError || showWin) return;
