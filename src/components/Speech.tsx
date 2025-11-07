@@ -22,7 +22,11 @@ export default function Speech({
 
     const speak = () => {
       const voices = synth.getVoices();
+      // intento encontrar voz de mejor calidad
       const voice =
+        voices.find((v) =>
+          v.name?.toLowerCase().includes("neural")
+        ) ||
         voices.find((v) => v.lang?.startsWith(lang)) ||
         voices.find((v) => v.name?.toLowerCase().includes("spanish")) ||
         voices[0];
@@ -30,20 +34,30 @@ export default function Speech({
       const u = new SpeechSynthesisUtterance(text);
       u.lang = voice?.lang || lang;
       u.voice = voice || null;
-      u.rate = rate;
-      u.pitch = pitch;
+      // ajusto rate/pitch para sonido más natural
+      u.rate = rate * 0.9;
+      u.pitch = pitch * 0.95;
 
       try {
-        synth.cancel();
+        if (synth.speaking) {
+          synth.cancel();
+        }
         synth.speak(u);
-      } catch {}
+      } catch (err) {
+        console.warn("Speech synthesis error:", err);
+      }
     };
 
-    if (synth.getVoices().length === 0) synth.onvoiceschanged = speak;
-    else speak();
+    if (synth.getVoices().length === 0) {
+      synth.onvoiceschanged = speak;
+    } else {
+      speak();
+    }
 
     return () => {
-      try { window.speechSynthesis.cancel(); } catch {}
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
     };
   }, [text, rate, pitch, lang, when]);
 

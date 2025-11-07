@@ -26,7 +26,7 @@ export default function TeamExploreGame({ onWin }: Props) {
       const newVisited = [...visited, id];
       setVisited(newVisited);
       if (newVisited.length === skills.length) {
-        setTimeout(() => setShowWin(true), 600);
+        setTimeout(() => setShowWin(true), 5000);
       }
     }
     setActiveSkill(id);
