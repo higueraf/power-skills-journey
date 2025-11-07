@@ -47,7 +47,6 @@ export default function BuildSentenceGame({ onWin }: Props) {
       // indices: 0..5
       // fila 0: 0,1,2 ; fila 1: 3,4,5
       const cols = 3;
-      const rows = 2;
       const totalW = (cols - 1) * gapX;
       const left = -totalW / 2;
       const topY = 1.1; // altura de la fila superior
