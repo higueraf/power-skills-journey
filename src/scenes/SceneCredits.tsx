@@ -62,7 +62,7 @@ export default function SceneCredits() {
             <CreditsOverlay
               onRestart={() => nav("/welcome")}
               onMore={() =>
-                window.open("https://openwebinars.net/blog/que-son-las-power-skills-y-por-que-son-tan-importantes/", "_blank", "noopener,noreferrer")
+                window.open("https://smowl.net/es/blog/power-skills/", "_blank", "noopener,noreferrer")
               }
             />
           </group>
