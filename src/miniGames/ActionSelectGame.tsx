@@ -1,237 +1,213 @@
-import { Html } from "@react-three/drei";
-import { useMemo, useState } from "react";
+import { Html, Text, Bounds } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { MeshBasicMaterial } from "three";
 import Modal from "../components/Modal";
 import Speech from "../components/Speech";
 import { theme, vivid } from "../theme";
 
 type Props = { onWin: () => void };
 
-type Item = {
-  id: string;
-  label: string;
-  correct: boolean;
-  color: string;
-  text: string; // speech breve al seleccionar correcto
-};
+function Label3D({ text, fontSize, color, borderColor, width, height, yOffset }: any) {
+  const textRef = useRef<any>(null);
+  useEffect(() => {
+    if (textRef.current) {
+      const mats = Array.isArray(textRef.current.material)
+        ? textRef.current.material
+        : [textRef.current.material];
+      mats.forEach((m: any) => {
+        if (m) {
+          (m as MeshBasicMaterial).depthTest = false;
+          (m as MeshBasicMaterial).depthWrite = false;
+        }
+      });
+    }
+  }, []);
+  return (
+    <group position={[0, yOffset, 0.15]} renderOrder={30}>
+      <mesh renderOrder={29}>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} />
+      </mesh>
+      <Text
+        ref={textRef}
+        fontSize={fontSize}
+        color={color}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.005}
+        outlineColor={borderColor}
+        maxWidth={width * 0.95}
+        lineHeight={1}
+        renderOrder={31}
+      >
+        {text}
+      </Text>
+    </group>
+  );
+}
 
-export default function ActionSelectGame({ onWin }: Props) {
-  // 3 correctos y 2 distractores
-  const items: Item[] = useMemo(
+export default function TeamExploreGame({ onWin }: Props) {
+  const [visited, setVisited] = useState<string[]>([]);
+  const [activeSkill, setActiveSkill] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(true);
+  const [showWin, setShowWin] = useState(false);
+
+  const { viewport, size } = useThree();
+  const isMobile = size.width < 640;
+  const isTablet = size.width >= 640 && size.width < 1024;
+  const isWide = !isMobile && !isTablet;
+
+  const skills = useMemo(
     () => [
-      {
-        id: "comunicacion",
-        label: "Comunicación efectiva",
-        correct: true,
-        color: vivid.blue,
-        text:
-          "Comunicación efectiva: mensajes claros y bidireccionales que mejoran el flujo de información.",
-      },
-      {
-        id: "critico",
-        label: "Pensamiento crítico",
-        correct: true,
-        color: vivid.green,
-        text:
-          "Pensamiento crítico: decisiones basadas en datos, análisis y reflexión constante.",
-      },
-      {
-        id: "colaboracion",
-        label: "Colaboración",
-        correct: true,
-        color: "#39D9A3",
-        text:
-          "Colaboración: trabajo en red entre docentes, estudiantes y entorno para multiplicar el impacto.",
-      },
-      // Distractores
-      {
-        id: "ruido",
-        label: "Ego Superinflado",
-        correct: false,
-        color: "#9AA7B2",
-        text: "",
-      },
-      {
-        id: "aislamiento",
-        label: "Aislamiento",
-        correct: false,
-        color: "#9AA7B2",
-        text: "",
-      },
+      { id: "empatia", name: "Dra. Empatía", color: vivid.green, text: "Liderar con empatía es entender antes de decidir. Escuchar y motivar impulsa el bienestar del equipo." },
+      { id: "adaptabilidad", name: "Ing. Adaptabilidad", color: vivid.blue, text: "En un entorno cambiante, cada desafío se convierte en una oportunidad para innovar." },
+      { id: "colaboracion", name: "Lic. Colaboración", color: "#39D9A3", text: "Fomentar alianzas entre docentes, estudiantes y empresas multiplica la productividad." },
+      { id: "estrategia", name: "Prof. Estrategia", color: "#4BA9E3", text: "Analizar, evaluar y cuestionar con propósito fortalece la calidad académica." },
+      { id: "innovacion", name: "Mtra. Innovación", color: "#23C7C0", text: "Transformar ideas en mensajes claros inspira a toda la organización." },
     ],
     []
   );
 
-  // Estado
-  const [selected, setSelected] = useState<string[]>([]);
-  const [showHelp, setShowHelp] = useState(true);
-  const [showError, setShowError] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [showWin, setShowWin] = useState(false);
-  const [speakText, setSpeakText] = useState("");
+  // 🔹 Tamaño base de las esferas
+  const SIZE_BOOST = 2.0;
+  const baseScale = useMemo(() => {
+    const raw = Math.max(0.32, Math.min(0.5, viewport.width / 14));
+    return raw * SIZE_BOOST;
+  }, [viewport.width]);
 
-  // Layout en fila
-  const baseX = -3.2;
-  const gap = 1.6;
-
-  const correctCount = items.filter((i) => i.correct).length;
-  
-
-  function toggle(id: string) {
-    if (showHelp || showError || showWin) return;
-
-    const it = items.find((i) => i.id === id);
-    if (!it) return;
-
-    // Si es distractor: error
-    if (!it.correct) {
-      setErrorMsg(
-        `“${it.label}” no corresponde a una Power Skill en acción. Intenta con comportamientos que impulsen la comunicación, el análisis y la colaboración.`
-      );
-      setShowError(true);
-      return;
-    }
-
-    // Correcto → activar
-    const already = selected.includes(id);
-    const next = already ? selected.filter((v) => v !== id) : [...selected, id];
-    setSelected(next);
-
-    // Speech breve al acertar
-    if (!already && it.text) {
-      setSpeakText(it.text);
-    } else {
-      setSpeakText("");
-    }
-
-    // Ganar cuando estén todos los correctos activos
-    if (!already) {
-      const nextCorrect = next.filter((v) => items.find((i) => i.id === v)?.correct).length;
-      if (nextCorrect === correctCount) {
-        setTimeout(() => setShowWin(true), 350);
-      }
-    }
+  let R = (isMobile ? 0.72 : 1) * 0.95 * baseScale;
+  // ⬇️ Reducimos el tamaño en desktop
+  if (!isMobile && !isTablet) {
+    R *= 0.8;
   }
 
+  const labelFont = Math.max(0.13, R * (isMobile ? 0.26 : 0.32));
+  const labelYOffset = R * (isMobile ? 1.05 : 1.15);
+
+  // 🔹 Piso y altura del grupo
+  const planeY = -viewport.height * 1.3;
+  const groupY = (!isMobile && !isTablet)
+    ? viewport.height * 0.16
+    : viewport.height * (isMobile ? 0.30 : 0.42);
+
+  // 🔹 Escala global del grupo en mobile
+  const GROUP_SCALE = isMobile ? Math.min(1, Math.max(0.62, viewport.width / 6.6)) : 1;
+
+  // 🔹 Espaciados
+  const spacingY = R * (isMobile ? 2.4 : 4.5);
+
+  const computeRowSpacingX = (itemsInRow: number) => {
+    const minByRadius = R * (isMobile ? 3.5 : 2.1);
+    const maxByViewport = viewport.width / (itemsInRow + (isMobile ? 1.2 : 1.0));
+    const capped = Math.min(maxByViewport, R * 3.0);
+    return Math.max(minByRadius, capped);
+  };
+
+  // 🔹 Posiciones adaptativas
+  const positions = useMemo<[number, number, number][]>(() => {
+    if (isWide) {
+      const total = skills.length;
+      const sx = computeRowSpacingX(total);
+      const startX = -((total - 1) * sx) / 2;
+      const rowY = 0.7; // centrado en web
+      return skills.map((_, i) => [startX + i * sx, rowY, 0]);
+    }
+
+    const rows = [[0, 1], [2, 3], [4]];
+    const rowYStart = isMobile ? 1.55 : 2.6;
+    const res: [number, number, number][] = [];
+    rows.forEach((row, rIdx) => {
+      const sx = computeRowSpacingX(row.length);
+      const y = rowYStart - rIdx * spacingY;
+      const startX = -((row.length - 1) * sx) / 2;
+      row.forEach((idx, i) => {
+        res[idx] = [startX + i * sx, y, 0];
+      });
+    });
+    return res;
+  }, [isWide, skills.length, viewport.width, spacingY, R, isMobile]);
+
+  const handleClick = (id: string) => {
+    if (showHelp || showWin) return;
+    if (!visited.includes(id)) {
+      const newVisited = [...visited, id];
+      setVisited(newVisited);
+      if (newVisited.length === skills.length) setTimeout(() => setShowWin(true), 700);
+    }
+    setActiveSkill(id);
+  };
+
   return (
-    <group position={[0, 0.8, 0]}>
-      {/* Modal inicial (instrucciones) */}
+    <group>
+      <ambientLight intensity={0.9} />
+
+      {/* Piso invisible */}
+      <mesh position={[0, planeY, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-10}>
+        <planeGeometry args={[60, 60]} />
+        <meshStandardMaterial color="#c7cecc" transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Modales */}
       <Html center>
-        <Modal
-          open={showHelp}
-          title="Juego: Power Skills en acción"
-          onPrimary={() => setShowHelp(false)}
-          type="info"
-          primaryLabel="Comenzar"
-        >
-          <p>
-            Activa las <b>3 conductas correctas</b> que demuestran Power Skills
-            en acción: <i>Comunicación efectiva, Pensamiento crítico y Colaboración</i>.
-            Evita los distractores.
-          </p>
-          <Speech
-            text="Activa las tres conductas correctas que demuestran Power Skills en acción: Comunicación efectiva, Pensamiento crítico y Colaboración. Evita los distractores."
-            when={showHelp}
-            lang="es-ES"
-          />
+        <Modal open={showHelp} title="Juego: Conociendo al equipo Power Skills" onPrimary={() => setShowHelp(false)}>
+          <p>Explora los cinco avatares. Toca cada uno para escuchar su aporte. Cuando los visites todos, avanzarás.</p>
+          <Speech text="Explora los cinco avatares. Toca cada uno para escuchar su aporte." when={showHelp} lang="es-ES" />
         </Modal>
       </Html>
 
-      {/* Modal de error */}
       <Html center>
-        <Modal
-          open={showError}
-          type="warning"
-          title="Ups… conducta distractora"
-          onPrimary={() => setShowError(false)}
-          primaryLabel="Intentar de nuevo"
-        >
-          <p>{errorMsg || "Esa opción no impulsa las Power Skills en acción."}</p>
-          <Speech
-            text={errorMsg || "Esa opción no impulsa las Power Skills en acción. Inténtalo de nuevo."}
-            when={showError}
-            lang="es-ES"
-          />
+        <Modal open={showWin} title="¡Excelente trabajo!" onPrimary={onWin} type="success">
+          <p>Has conocido a todo el equipo Power Skills. ¡Tu curiosidad y liderazgo fortalecen la colaboración!</p>
+          <Speech text="¡Excelente trabajo!" when={showWin} lang="es-ES" />
         </Modal>
       </Html>
 
-      {/* Modal de éxito */}
-      <Html center>
-        <Modal
-          open={showWin}
-          type="success"
-          title="¡Excelente! Power Skills en marcha"
-          onPrimary={onWin}
-          primaryLabel="Continuar"
-        >
-          <p>
-            Has activado las conductas clave para poner en acción las Power Skills.
-            ¡Sigamos!
-          </p>
-          <Speech
-            text="Excelente. Has activado las conductas clave para poner en acción las Power Skills. Sigamos."
-            when={showWin}
-            lang="es-ES"
-          />
-        </Modal>
-      </Html>
+      {/* Avatares */}
+      <Bounds observe clip margin={1.1} fit>
+        <group position={[0, groupY, 0]} scale={[GROUP_SCALE, GROUP_SCALE, GROUP_SCALE]}>
+          {skills.map((skill, i) => {
+            const [x, y, z] = positions[i] ?? [0, 1.1, 0];
+            const active = visited.includes(skill.id);
 
-      {/* Speech corto al seleccionar un correcto */}
-      {speakText && (
-        <Speech text={speakText} when={true} lang="es-ES" />
+            const approxWidth = Math.max(
+              1.4,
+              Math.min(3.2, labelFont * (skill.name.length * (isMobile ? 0.30 : 0.34)))
+            );
+            const approxHeight = labelFont * (isMobile ? 1.5 : 1.8);
+
+            return (
+              <group key={skill.id} position={[x, y, z]} onClick={() => handleClick(skill.id)}>
+                <mesh>
+                  <sphereGeometry args={[R, 32, 32]} />
+                  <meshStandardMaterial
+                    color={active ? skill.color : theme.padBlue}
+                    emissive={active ? (vivid.greenGlow ?? "#0a3") : (theme.glowBlue ?? "#013")}
+                    emissiveIntensity={active ? 0.6 : 0.25}
+                  />
+                </mesh>
+                <Label3D
+                  text={skill.name}
+                  fontSize={labelFont}
+                  color={theme.text}
+                  borderColor={theme.border}
+                  width={approxWidth}
+                  height={approxHeight}
+                  yOffset={labelYOffset}
+                />
+              </group>
+            );
+          })}
+        </group>
+      </Bounds>
+
+      {activeSkill && (
+        <Speech
+          text={skills.find((s) => s.id === activeSkill)?.text || ""}
+          when={true}
+          lang="es-ES"
+        />
       )}
-
-      {/* Pads/esferas 3D con etiquetas */}
-      {items.map((it, i) => {
-        const active = selected.includes(it.id);
-        return (
-          <group key={it.id} position={[baseX + i * gap, 0, 0]}>
-            <mesh onClick={() => toggle(it.id)} castShadow>
-              <sphereGeometry args={[0.5, 32, 32]} />
-              <meshStandardMaterial
-                color={active ? it.color : theme.padBlue}
-                emissive={active ? (it.correct ? vivid.greenGlow : theme.glowBlue) : theme.glowBlue}
-                emissiveIntensity={active ? 0.5 : 0.25}
-                metalness={0.08}
-                roughness={0.35}
-              />
-            </mesh>
-
-            <Html center position={[0, 1.0, 0]}>
-              <div
-                style={{
-                  background: "rgba(255,255,255,0.92)",
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 10,
-                  padding: "6px 12px",
-                  color: theme.text,
-                  fontWeight: 700,
-                  fontSize: 14,
-                  textAlign: "center",
-                  width: 180,
-                }}
-              >
-                {it.label}
-              </div>
-            </Html>
-          </group>
-        );
-      })}
-
-      {/* Hint siempre visible */}
-      <Html center position={[0, 1.8, 0]}>
-        <div
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            border: `1px solid ${theme.border}`,
-            borderRadius: 12,
-            padding: "6px 12px",
-            color: theme.text,
-            fontWeight: 700,
-          }}
-        >
-          Activa 3 conductas correctas
-        </div>
-      </Html>
     </group>
   );
 }

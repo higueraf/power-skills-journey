@@ -74,8 +74,8 @@ export default function TeamExploreGame({ onWin }: Props) {
   const labelYOffset = R * 1.35; // ⬆️ etiqueta un poco más alta
 
   /** 🔹 Piso bien abajo y grupo más arriba */
-  const planeY = -viewport.height * 1.2;   // ⬇️ baja el piso de forma clara
-  const groupY = viewport.height * 0.28;   // ⬆️ sube el grupo de esferas
+  const planeY = -viewport.height * 5.2;   // ⬇️ baja el piso de forma clara
+  const groupY = viewport.height * 1.28;   // ⬆️ sube el grupo de esferas
   const spacingY = isMobile ? R * 4.4 : R * 3.2;
 
   /** 🔹 Separación horizontal más amplia */
@@ -133,7 +133,7 @@ export default function TeamExploreGame({ onWin }: Props) {
       <mesh position={[0, planeY, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-10}>
         <planeGeometry args={[60, 60]} />
         <meshStandardMaterial
-          color="#c7cecc"
+          color="green"
           transparent
           opacity={0}       // 🔹 completamente invisible
           depthWrite={false}
