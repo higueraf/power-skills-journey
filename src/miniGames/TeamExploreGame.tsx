@@ -120,7 +120,7 @@ export default function TeamExploreGame({ onWin }: Props) {
     if (!visited.includes(id)) {
       const newVisited = [...visited, id];
       setVisited(newVisited);
-      if (newVisited.length === skills.length) setTimeout(() => setShowWin(true), 900);
+      if (newVisited.length === skills.length) setTimeout(() => setShowWin(true), 5000);
     }
     setActiveSkill(null); // reset para re-disparar audio aunque sea el mismo
     // pequeño timeout para asegurar nuevo render y volver a activar narración

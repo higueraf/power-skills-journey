@@ -1,8 +1,8 @@
 import { Html } from "@react-three/drei";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import Modal from "../components/Modal";
-import AudioNarration from "../components/AudioNarration"; // ⬅️ MP3
+import AudioNarration from "../components/AudioNarration";
 import { theme, vivid } from "../theme";
 
 type Props = { onWin: () => void };
@@ -13,70 +13,96 @@ export default function BuildSentenceGame({ onWin }: Props) {
     []
   );
 
-  const { viewport } = useThree();
+  // --- barajar (Fisher–Yates) ---
+  const shuffle = <T,>(arr: T[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  // palabras a mostrar (desordenadas)
+  const [words, setWords] = useState<string[]>([]);
+
+  // baraja al montar
+  useEffect(() => {
+    setWords(shuffle(correctOrder));
+  }, [correctOrder]);
+
+  const { viewport, size } = useThree();
   const vw = viewport.width;
   const vh = viewport.height;
 
-  // ---- Parámetros base (en unidades 3D) ----
-  const baseScale = 1.0;
+  const isMobile = size.width < 640;
+  const isTablet = size.width >= 640 && size.width < 1024;
+
+  // ---- Tamaños base ----
+  const baseScale = isMobile ? 0.9 : 1.0;
   const barW = 0.95 * baseScale;
   const barH = 0.34 * baseScale;
   const barD = 0.55 * baseScale;
 
-  const gapX = 1.35 * baseScale;
-  const gapY = 0.85 * baseScale;
+  // 👉 Altura "real" de una celda (cubo + label)
+  const labelH = (isMobile ? 0.55 : 0.5) * baseScale; // alto estimado del chip Html
+  const cellH = barH + labelH;
 
+  // gaps
+  const gapX = (isMobile ? 1.05 : 1.35) * baseScale;
+  const gapY = (isMobile ? 0.60 : 0.75) * baseScale;
+
+  // márgenes seguros
   const marginX = 0.45;
-  const marginY = 0.45;
+  const marginY = isMobile ? 1.20 : 0.60;
 
-  // ---- ¿Cabe 1x6 a lo ancho? ----
-  const needW_1x6 = (6 - 1) * gapX + barW;
-  const fitsOneRow = needW_1x6 <= (vw - 2 * marginX);
-
+  // ---- Grid: móvil fijo 3×2; resto trata de encajar ----
   type Grid = { rows: number; cols: number };
-  const candidates: Grid[] = fitsOneRow
-    ? [{ rows: 1, cols: 6 }, { rows: 2, cols: 3 }, { rows: 3, cols: 2 }]
-    : [{ rows: 2, cols: 3 }, { rows: 3, cols: 2 }, { rows: 1, cols: 6 }];
-
   const pickGrid = (): Grid => {
+    if (isMobile) return { rows: 3, cols: 2 };
+    const candidates: Grid[] = [{ rows: 1, cols: 6 }, { rows: 2, cols: 3 }, { rows: 3, cols: 2 }];
     for (const g of candidates) {
       const gridW = (Math.min(g.cols, 6) - 1) * gapX + barW;
-      const gridH = g.rows * barH + (g.rows - 1) * gapY;
+      const gridH = g.rows * cellH + (g.rows - 1) * gapY;
       const fitsW = gridW <= (vw - 2 * marginX);
       const fitsH = gridH <= (vh - 2 * marginY);
       if (fitsW && fitsH) return g;
     }
     return { rows: 3, cols: 2 };
   };
-
   const grid = pickGrid();
 
+  // Tamaño del grid SIN escalar
   const rawGridW = (Math.min(grid.cols, 6) - 1) * gapX + barW;
-  const rawGridH = grid.rows * barH + (grid.rows - 1) * gapY;
+  const rawGridH = grid.rows * cellH + (grid.rows - 1) * gapY;
 
+  // Auto-fit
   const maxW = Math.max(0.0001, vw - 2 * marginX);
   const maxH = Math.max(0.0001, vh - 2 * marginY);
   const scaleToFit = Math.min(maxW / rawGridW, maxH / rawGridH, 1.0);
 
+  // Posiciones centradas (usando cellH), basadas en cantidad de palabras
   const positions = useMemo<[number, number, number][]>(() => {
     const cols = grid.cols;
     const rows = grid.rows;
+
     const totalW = (Math.min(cols, 6) - 1) * gapX;
-    const totalH = (rows - 1) * gapY;
+    const totalH = (rows - 1) * (cellH + gapY);
+
     const left = -totalW / 2;
     const top = totalH / 2;
 
-    return correctOrder.map((_, idx) => {
+    return (words.length ? words : correctOrder).map((_, idx) => {
       const r = Math.floor(idx / cols);
       const c = idx % cols;
       const x = left + c * gapX;
-      const y = top - r * gapY;
+      const y = top - r * (cellH + gapY);
       return [x, y, 0];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid.rows, grid.cols, gapX, gapY, correctOrder.length]);
+  }, [grid.rows, grid.cols, gapX, gapY, cellH, words.length]);
 
-  // ---- Estado de juego ----
+  // Estado
   const [selected, setSelected] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
@@ -87,7 +113,6 @@ export default function BuildSentenceGame({ onWin }: Props) {
   const handleWordClick = (word: string) => {
     if (showHelp) return;
     if (selected.includes(word)) return;
-
     const newSelection = [...selected, word];
     setSelected(newSelection);
 
@@ -110,16 +135,22 @@ export default function BuildSentenceGame({ onWin }: Props) {
     setSelected([]);
     setMessage1(null);
     setMessage2(null);
+    // re-barajar al reintentar
+    setWords(shuffle(correctOrder));
   };
 
   return (
-    <group scale={scaleToFit}>
-      {/* Modal de instrucciones (con MP3) */}
+    <group scale={scaleToFit} position={[0, 0, 0]}>
+      {/* Modal ayuda */}
       <Html center>
         <Modal
           open={showHelp}
           title="Juego: Liderazgo Adaptativo"
-          onPrimary={() => setShowHelp(false)}
+          onPrimary={() => {
+            setShowHelp(false);
+            // opcional: barajar al cerrar ayuda
+            setWords(shuffle(correctOrder));
+          }}
           type="info"
         >
           <p>
@@ -127,23 +158,18 @@ export default function BuildSentenceGame({ onWin }: Props) {
             <br />
             <i>“El liderazgo adaptativo inspira al equipo”.</i>
           </p>
-
-          {/* 🔊 Narración MP3 mientras está el modal abierto */}
-          <AudioNarration
-            src="/audio/05-build-help.mp3"
-            when={showHelp}
-            rate={1}
-            volume={1}
-          />
+          <AudioNarration src="/audio/05-build-help.mp3" when={showHelp} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Palabras 3D interactivas */}
-      {correctOrder.map((word, i) => {
+      {/* Celdas (renderiza palabras barajadas) */}
+      {(words.length ? words : correctOrder).map((word, i) => {
         const pos = positions[i] || [0, 0, 0];
         const isPicked = selected.includes(word);
+        const labelOffsetY = barH * 1.15;
+
         return (
-          <group key={word} position={pos}>
+          <group key={`${word}-${i}`} position={pos} scale={isMobile ? 1.03 : 1}>
             <mesh onClick={() => handleWordClick(word)} castShadow frustumCulled={false}>
               <boxGeometry args={[barW, barH, barD]} />
               <meshStandardMaterial
@@ -157,7 +183,7 @@ export default function BuildSentenceGame({ onWin }: Props) {
 
             <Html
               center
-              position={[0, barH * 0.9, 0]}
+              position={[0, labelOffsetY, 0]}
               transform
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -171,17 +197,23 @@ export default function BuildSentenceGame({ onWin }: Props) {
                   }
                 }}
                 style={{
-                  color: theme.text,
+                  color: isPicked ? "#fff" : theme.text,
                   fontWeight: 700,
-                  fontSize: grid.rows >= 3 ? 6 : 5,
-                  background: "rgba(255,255,255,0.85)",
-                  borderRadius: 8,
-                  padding: grid.rows >= 3 ? "3px 5px" : "4px 6px",
+                  fontSize: isMobile ? 5.2 : grid.rows >= 3 ? 6 : 5,
+                  background: isPicked
+                    ? "linear-gradient(135deg, #2ea043, #58a6ff)" // 💡 fondo activo con degradado
+                    : "rgba(255,255,255,0.92)",
+                  borderRadius: 10,
+                  padding: isMobile ? "3px 6px" : grid.rows >= 3 ? "3px 5px" : "4px 6px",
                   border: `1px solid ${theme.border}`,
                   cursor: "pointer",
                   userSelect: "none",
                   touchAction: "manipulation",
-                  boxShadow: isPicked ? "0 0 10px rgba(0,0,0,.12)" : "none",
+                  boxShadow: isPicked
+                    ? "0 0 15px rgba(88,166,255,0.5)"
+                    : "0 0 5px rgba(0,0,0,.1)",
+                  transition: "all 0.25s ease",
+                  transform: isPicked ? "scale(1.05)" : "scale(1)",
                 }}
                 aria-pressed={isPicked}
                 role="button"
@@ -190,55 +222,32 @@ export default function BuildSentenceGame({ onWin }: Props) {
                 {word}
               </button>
             </Html>
+
           </group>
         );
       })}
 
-      {/* Modal éxito */}
+      {/* Éxito */}
       <Html center>
-        <Modal
-          open={showMessage}
-          title="Juego: Liderazgo Adaptativo"
-          onPrimary={() => onWin()}
-          type="success"
-        >
+        <Modal open={showMessage} title="Juego: Liderazgo Adaptativo" onPrimary={() => onWin()} type="success">
           <p>
             {message1}
             <br />
             <i>{message2}</i>
           </p>
-
-          {/* 🔊 MP3 éxito */}
-          <AudioNarration
-            src="/audio/06-build-success.mp3"
-            when={showMessage}
-            rate={1}
-            volume={1}
-          />
+          <AudioNarration src="/audio/06-build-success.mp3" when={showMessage} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Modal error */}
+      {/* Error */}
       <Html center>
-        <Modal
-          open={showMessageError}
-          title="Juego: Liderazgo Adaptativo"
-          onPrimary={continueClick}
-          type="warning"
-        >
+        <Modal open={showMessageError} title="Juego: Liderazgo Adaptativo" onPrimary={continueClick} type="warning">
           <p>
             {message1}
             <br />
             <i>{message2}</i>
           </p>
-
-          {/* 🔊 MP3 error */}
-          <AudioNarration
-            src="/audio/07-build-error.mp3"
-            when={showMessageError}
-            rate={1}
-            volume={1}
-          />
+          <AudioNarration src="/audio/07-build-error.mp3" when={showMessageError} rate={1} volume={1} />
         </Modal>
       </Html>
     </group>
