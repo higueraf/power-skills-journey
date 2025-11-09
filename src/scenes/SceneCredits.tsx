@@ -62,7 +62,7 @@ export default function SceneCredits() {
             <CreditsOverlay
               onRestart={() => nav("/welcome")}
               onMore={() =>
-                window.open("https://es.wikipedia.org/wiki/Habilidades_blandas", "_blank", "noopener,noreferrer")
+                window.open("https://openwebinars.net/blog/que-son-las-power-skills-y-por-que-son-tan-importantes/", "_blank", "noopener,noreferrer")
               }
             />
           </group>
