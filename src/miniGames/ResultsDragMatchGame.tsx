@@ -228,7 +228,7 @@ export default function ResultsDragMatchGame({ onWin }: Props) {
                   whiteSpace: "nowrap",
                 }}
               >
-                Arrastra y suelta
+                {it.label}
               </div>
             </Html>
           </group>
