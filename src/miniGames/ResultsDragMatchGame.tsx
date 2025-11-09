@@ -275,7 +275,7 @@ export default function ResultsDragMatchGame({ onWin }: Props) {
           onPrimary={onWin}
           primaryLabel="Continuar"
         >
-          <p>¡Excelente! Vinculaste correctamente los logros con sus pedestales. Avancemos a la reflexión final.</p>
+          <p>¡Excelente! Vinculaste correctamente los logros con sus pedestales. Avancemos.</p>
           <AudioNarration src="/audio/27-results-success.mp3" when={showWin || allPlaced} rate={1} volume={1} />
         </Modal>
       </Html>

@@ -210,7 +210,7 @@ export default function ReflectionChooseSkillGame({ onWin }: Props) {
           onPrimary={onWin}
           primaryLabel="Continuar"
         >
-          <p>Excelente elección. Lleva esta Power Skill a tu práctica diaria. Pasemos a los créditos finales.</p>
+          <p>Excelente elección. Lleva esta Power Skill a tu práctica diaria. Continuemos.</p>
           <AudioNarration src="/audio/30-reflection-success.mp3" when={showWin} rate={1} volume={1} />
         </Modal>
       </Html>
