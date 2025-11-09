@@ -1,19 +1,13 @@
 import { Html } from "@react-three/drei";
-import Speech from "./Speech";
+import { useState } from "react";
+import AudioNarration from "../components/AudioNarration";
 import { theme, vivid } from "../theme";
 
-type Props = {
-  onRestart: () => void;
-  onMore: () => void;
-};
+type Props = { onRestart: () => void; onMore: () => void };
 
-/**
- * Overlay de créditos centrado (DOM en Html).
- * Incluye Speech opcional de agradecimiento y dos botones:
- * - Reiniciar el viaje
- * - Conoce más sobre las Power Skills
- */
 export default function CreditsOverlay({ onRestart, onMore }: Props) {
+  const [playOutro, setPlayOutro] = useState(false);
+
   return (
     <Html center>
       <div
@@ -30,16 +24,25 @@ export default function CreditsOverlay({ onRestart, onMore }: Props) {
       >
         <h2 style={{ margin: "0 0 10px", fontSize: "1.8rem" }}>Créditos</h2>
 
-        <div style={{ lineHeight: 1.6, fontSize: 18 }}>
-          <p style={{ margin: "6px 0" }}>
-            <b>UNEFM – Maestría en Calidad y Productividad</b>
+        {/* Nombres centrados en líneas separadas */}
+        <div style={{ lineHeight: 1.6, fontSize: 18, textAlign: "center" }}>
+
+          <p style={{ marginTop: 12 }}>
+            Propuesta creada por el equipo representando por:
           </p>
-          <p style={{ margin: "6px 0" }}>
-            Propuesta creada por el equipo académico representando la Jefatura de la Maestría.
+                    <p style={{ margin: "6px 0" }}><b>Bracho Damelys</b></p>
+          <p style={{ margin: "6px 0" }}><b>García Yamilet</b></p>
+          <p style={{ margin: "6px 0" }}><b>Molina Otto</b></p>
+          <p style={{ margin: "6px 0" }}><b>Nuñez Juan</b></p>
+          <p style={{ margin: "6px 0" }}><b>Quintero Rosa</b></p>
+          <p style={{ margin: "6px 0" }}><b>Ramírez Juan</b></p>
+          <p style={{ marginTop: 12 }}>
+             
+
+            para el <b>Seminario Emergente II</b>, Tema: <b>“Power Skills”</b> del
+            <b> Programa de Doctorado en Ciencias Gerenciales, VI Cohorte.</b> <b>UNEFM</b>
           </p>
-          <p style={{ margin: "6px 0" }}>
-            Seminario: <i>Power Skills para la Gerencia Moderna</i> — Noviembre 2025.
-          </p>
+
         </div>
 
         <div style={{ marginTop: 18, opacity: 0.9, fontSize: 16 }}>
@@ -88,12 +91,25 @@ export default function CreditsOverlay({ onRestart, onMore }: Props) {
         </div>
       </div>
 
-      {/* Narración breve de cierre */}
-      <Speech
-        text="Gracias por acompañarnos en este viaje. Las Power Skills impulsan la calidad, la productividad y el liderazgo humano. ¡Hasta pronto!"
-        when={true}
-        lang="es-ES"
+      {/* 1) Créditos; al terminar, dispara el cierre */}
+      <AudioNarration
+        src="/audio/36-credits.mp3"
+        when={!playOutro}
+        rate={1}
+        volume={1}
+        onEnded={() => setPlayOutro(true)}
       />
+
+      {/* 2) Cierre del recorrido */}
+      {playOutro && (
+        <AudioNarration
+          key="outro"
+          src="/audio/37-outro.mp3"
+          when={true}
+          rate={1}
+          volume={1}
+        />
+      )}
     </Html>
   );
 }

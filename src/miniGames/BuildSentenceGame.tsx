@@ -2,7 +2,7 @@ import { Html } from "@react-three/drei";
 import { useMemo, useState } from "react";
 import { useThree } from "@react-three/fiber";
 import Modal from "../components/Modal";
-import Speech from "../components/Speech";
+import AudioNarration from "../components/AudioNarration"; // ⬅️ MP3
 import { theme, vivid } from "../theme";
 
 type Props = { onWin: () => void };
@@ -13,12 +13,12 @@ export default function BuildSentenceGame({ onWin }: Props) {
     []
   );
 
-  const { viewport } = useThree(); // medidas del mundo a z=0
+  const { viewport } = useThree();
   const vw = viewport.width;
   const vh = viewport.height;
 
   // ---- Parámetros base (en unidades 3D) ----
-  const baseScale = 1.0;               // escala base del bloque
+  const baseScale = 1.0;
   const barW = 0.95 * baseScale;
   const barH = 0.34 * baseScale;
   const barD = 0.55 * baseScale;
@@ -26,20 +26,18 @@ export default function BuildSentenceGame({ onWin }: Props) {
   const gapX = 1.35 * baseScale;
   const gapY = 0.85 * baseScale;
 
-  const marginX = 0.45; // margen visible seguro contra bordes del viewport
+  const marginX = 0.45;
   const marginY = 0.45;
 
   // ---- ¿Cabe 1x6 a lo ancho? ----
   const needW_1x6 = (6 - 1) * gapX + barW;
   const fitsOneRow = needW_1x6 <= (vw - 2 * marginX);
 
-  // Candidatos de grid, probados en orden
   type Grid = { rows: number; cols: number };
   const candidates: Grid[] = fitsOneRow
     ? [{ rows: 1, cols: 6 }, { rows: 2, cols: 3 }, { rows: 3, cols: 2 }]
     : [{ rows: 2, cols: 3 }, { rows: 3, cols: 2 }, { rows: 1, cols: 6 }];
 
-  // Elige el grid que mejor encaje (sin escalar)
   const pickGrid = (): Grid => {
     for (const g of candidates) {
       const gridW = (Math.min(g.cols, 6) - 1) * gapX + barW;
@@ -48,32 +46,25 @@ export default function BuildSentenceGame({ onWin }: Props) {
       const fitsH = gridH <= (vh - 2 * marginY);
       if (fitsW && fitsH) return g;
     }
-    // si ninguno cabe, usa el más compacto (3x2) y lo escalamos
     return { rows: 3, cols: 2 };
   };
 
   const grid = pickGrid();
 
-  // Tamaño del grid SIN escalar
   const rawGridW = (Math.min(grid.cols, 6) - 1) * gapX + barW;
   const rawGridH = grid.rows * barH + (grid.rows - 1) * gapY;
 
-  // ---- Auto-fit global: calcula la escala para encajar en viewport ----
   const maxW = Math.max(0.0001, vw - 2 * marginX);
   const maxH = Math.max(0.0001, vh - 2 * marginY);
-  const scaleToFit = Math.min(maxW / rawGridW, maxH / rawGridH, 1.0); // nunca agrandes >1, solo reduce si hace falta
+  const scaleToFit = Math.min(maxW / rawGridW, maxH / rawGridH, 1.0);
 
-  // ---- Posiciones centradas en (0,0) ----
   const positions = useMemo<[number, number, number][]>(() => {
-    // con el grid elegido, centramos por filas/columnas alrededor del origen
     const cols = grid.cols;
     const rows = grid.rows;
-
     const totalW = (Math.min(cols, 6) - 1) * gapX;
     const totalH = (rows - 1) * gapY;
-
     const left = -totalW / 2;
-    const top = totalH / 2; // así el centro del grid queda en y=0
+    const top = totalH / 2;
 
     return correctOrder.map((_, idx) => {
       const r = Math.floor(idx / cols);
@@ -96,6 +87,7 @@ export default function BuildSentenceGame({ onWin }: Props) {
   const handleWordClick = (word: string) => {
     if (showHelp) return;
     if (selected.includes(word)) return;
+
     const newSelection = [...selected, word];
     setSelected(newSelection);
 
@@ -121,9 +113,8 @@ export default function BuildSentenceGame({ onWin }: Props) {
   };
 
   return (
-    // Escalamos el grupo completo para encajar en viewport y quedar centrado en (0,0)
     <group scale={scaleToFit}>
-      {/* Modal de instrucciones */}
+      {/* Modal de instrucciones (con MP3) */}
       <Html center>
         <Modal
           open={showHelp}
@@ -136,21 +127,23 @@ export default function BuildSentenceGame({ onWin }: Props) {
             <br />
             <i>“El liderazgo adaptativo inspira al equipo”.</i>
           </p>
-          <Speech
-            text="Toca las palabras en el orden correcto para formar la frase: El liderazgo adaptativo inspira al equipo."
+
+          {/* 🔊 Narración MP3 mientras está el modal abierto */}
+          <AudioNarration
+            src="/audio/05-build-help.mp3"
             when={showHelp}
-            lang="es-ES"
+            rate={1}
+            volume={1}
           />
         </Modal>
       </Html>
 
-      {/* Palabras 3D interactivas, centradas en X/Y */}
+      {/* Palabras 3D interactivas */}
       {correctOrder.map((word, i) => {
         const pos = positions[i] || [0, 0, 0];
         const isPicked = selected.includes(word);
         return (
           <group key={word} position={pos}>
-            {/* Cubo 3D clicable */}
             <mesh onClick={() => handleWordClick(word)} castShadow frustumCulled={false}>
               <boxGeometry args={[barW, barH, barD]} />
               <meshStandardMaterial
@@ -162,7 +155,6 @@ export default function BuildSentenceGame({ onWin }: Props) {
               />
             </mesh>
 
-            {/* Label Html también clicable */}
             <Html
               center
               position={[0, barH * 0.9, 0]}
@@ -202,7 +194,7 @@ export default function BuildSentenceGame({ onWin }: Props) {
         );
       })}
 
-      {/* Modales de resultado */}
+      {/* Modal éxito */}
       <Html center>
         <Modal
           open={showMessage}
@@ -215,14 +207,18 @@ export default function BuildSentenceGame({ onWin }: Props) {
             <br />
             <i>{message2}</i>
           </p>
-          <Speech
-            text={`${message1 ?? ""} ${message2 ?? ""}`}
+
+          {/* 🔊 MP3 éxito */}
+          <AudioNarration
+            src="/audio/06-build-success.mp3"
             when={showMessage}
-            lang="es-ES"
+            rate={1}
+            volume={1}
           />
         </Modal>
       </Html>
 
+      {/* Modal error */}
       <Html center>
         <Modal
           open={showMessageError}
@@ -235,10 +231,13 @@ export default function BuildSentenceGame({ onWin }: Props) {
             <br />
             <i>{message2}</i>
           </p>
-          <Speech
-            text={`${message1 ?? ""} ${message2 ?? ""}`}
+
+          {/* 🔊 MP3 error */}
+          <AudioNarration
+            src="/audio/07-build-error.mp3"
             when={showMessageError}
-            lang="es-ES"
+            rate={1}
+            volume={1}
           />
         </Modal>
       </Html>

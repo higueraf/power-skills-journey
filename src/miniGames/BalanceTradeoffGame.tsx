@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { theme, vivid } from "../theme";
 import Modal from "../components/Modal";
-import Speech from "../components/Speech";
+import AudioNarration from "../components/AudioNarration"; // ⬅️ MP3
 
 export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
   const groupRef = useRef<THREE.Group>(null!);
@@ -43,7 +43,6 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
 
   const getLocalXFromEvent = (e: any) => {
     const ray: THREE.Ray = e.ray; // world-space ray
-    // Plano del grupo en world-space: normal = (0,1,0) transformada por el grupo; punto = origen del grupo
     groupRef.current.getWorldPosition(tmpPos);
     groupRef.current.getWorldQuaternion(tmpQuat);
     const worldNormal = tmpVec.set(0, 1, 0).applyQuaternion(tmpQuat).normalize();
@@ -51,7 +50,6 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
 
     const hit = ray.intersectPlane(tmpPlane, tmpVec);
     if (!hit) return x; // si no intersecta, mantenemos x actual
-    // Convertimos el punto de mundo a local del grupo y usamos su X
     const local = hit.clone();
     groupRef.current.worldToLocal(local);
     return local.x;
@@ -111,11 +109,9 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
   // 🔹 Posición horizontal de etiquetas (más centradas en mobile)
   const labelOffset = isMobile ? railHalf + 0.2 : railHalf + 0.55;
 
-
   return (
-    // 📱 Escalamos todo y trabajamos SIEMPRE en coordenadas locales del grupo
     <group ref={groupRef} position={[0, groupY, 0]} scale={[SCALE, SCALE, SCALE]}>
-      {/* Zona verde (ancho en local) */}
+      {/* Zona verde */}
       <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[tolerance * 2.2, 0.26, 1, 1]} />
         <meshStandardMaterial
@@ -140,7 +136,7 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
         />
       </mesh>
 
-      {/* 🔍 Riel "hit area" invisible, más alto y grueso para touch */}
+      {/* Hit area del riel */}
       <mesh
         position={[0, 0, 0]}
         onPointerDown={onRailDown}
@@ -148,7 +144,6 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
         onPointerUp={onRailUp}
       >
         <boxGeometry
-          // más grande en móvil para capturar toques imprecisos
           args={[
             railHalf * 2 + (isMobile ? 1.0 : 0.6),
             isMobile ? 0.9 : 0.6,
@@ -221,30 +216,29 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
         </div>
       </Html>
 
-
-      {/* Instrucciones */}
+      {/* Instrucciones (MP3) */}
       <Html center>
-        <Modal open={showHelp} title="Juego: Conociendo al equipo Power Skills" onPrimary={() => setShowHelp(false)}>
+        <Modal
+          open={showHelp}
+          title="Juego: Balance Enfoque humano vs Productividad"
+          onPrimary={() => setShowHelp(false)}
+        >
           <p>
             Arrastra la <b>esfera</b> sobre el riel y suéltala dentro de la <b>zona verde</b> para lograr el balance.
           </p>
-          <Speech
-            text="Arrastra la esfera sobre la guía y suéltala dentro de la zona verde para lograr el balance."
-            when={showHelp}
-            lang="es-ES"
-          />
+          <AudioNarration src="/audio/15-balance-help.mp3" when={showHelp} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Éxito */}
+      {/* Éxito (MP3) */}
       <Html center>
-        <Modal open={won} title="Juego: Conociendo al equipo Power Skills" onPrimary={() => onWin()}>
+        <Modal open={won} title="¡Balance logrado!" onPrimary={() => onWin()} type="success">
           <p>¡Muy bien! Encontraste un balance saludable. Pulsa <b>Continuar</b>.</p>
-          <Speech text="Muy bien. Encontraste un balance saludable. Pulsa Continuar." when={won} lang="es-ES" />
+          <AudioNarration src="/audio/16-balance-success.mp3" when={won} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Error */}
+      {/* Error (MP3) */}
       <Html center>
         <Modal
           open={showError}
@@ -254,7 +248,7 @@ export default function BalanceTradeoffGame({ onWin }: { onWin: () => void }) {
           primaryLabel="Intentar de nuevo"
         >
           <p>Suelta la esfera dentro de la <b>zona verde</b> para lograr el balance.</p>
-          <Speech text="Suelta la esfera dentro de la zona verde para lograr el balance." when={showError} lang="es-ES" />
+          <AudioNarration src="/audio/17-balance-error.mp3" when={showError} rate={1} volume={1} />
         </Modal>
       </Html>
     </group>

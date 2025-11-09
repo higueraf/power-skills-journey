@@ -3,7 +3,8 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import Modal from "../components/Modal";
-import Speech from "../components/Speech";
+// ⬇️ reemplazo de Speech por MP3
+import AudioNarration from "../components/AudioNarration";
 import { theme, vivid } from "../theme";
 
 type Props = { onWin: () => void };
@@ -12,56 +13,41 @@ type Item = {
   id: "eficiencia" | "compromiso" | "innovacion";
   label: string;
   color: string;
-  start: [number, number, number];   // posición inicial del bloque
-  target: [number, number, number];  // pedestal correcto
+  start: [number, number, number];
+  target: [number, number, number];
   hint: string;
 };
 
 export default function ResultsDragMatchGame({ onWin }: Props) {
   const { size, gl, viewport } = useThree();
   const isMobile = size.width < 640;
-  
-  // Evita scroll/pinch del navegador durante drag táctil
+
   useEffect(() => {
     gl.domElement.style.touchAction = "none";
   }, [gl]);
 
-  /** ========================
-   *  Medidas responsive
-   *  ======================== */
-  // Escala del grupo (mobile más chico)
+  // Escala / layout
   const GROUP_SCALE = isMobile ? Math.min(1, Math.max(0.60, viewport.width / 6.6)) : 1;
+  const MOBILE_SPACING = isMobile ? Math.max(1.5, Math.min(1.9, viewport.width / 3.4)) : 2.4;
 
-  // Espaciado horizontal en mobile: usa viewport.width (unidades de mundo)
-  // para garantizar que las 3 columnas quepan sin solaparse
-  const MOBILE_SPACING = isMobile
-  ? Math.max(1.5, Math.min(1.9, viewport.width / 3.4))
-  : 2.4;
+  const X_LEFT  = isMobile ? -MOBILE_SPACING : -2.2;
+  const X_MID   = 0;
+  const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
 
-// Posiciones base
-const X_LEFT  = isMobile ? -MOBILE_SPACING : -2.2;
-const X_MID   = 0;
-const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
-  // Z (profundidad): agrando el “carril” en mobile para que haya aire entre labels
   const Z_START = isMobile ?  1.0 :  1.2;
   const Z_TGT   = isMobile ? -1.0 : -0.9;
   const Y_LEVEL = 0.2;
 
-  // Tamaños de bloques y textos (más compactos en mobile)
   const BLOCK_SIZE  = isMobile ? 0.52 : 0.70;
   const BLOCK_H     = isMobile ? 0.26 : 0.35;
-  const CAPTION_Y   = isMobile ? 0.34 : 0.50;       // texto del bloque más bajo en mobile
+  const CAPTION_Y   = isMobile ? 0.34 : 0.50;
   const CAPTION_PX  = isMobile ? 10 : 13;
   const TARGET_R    = isMobile ? 0.36 : 0.45;
   const TARGET_TXT_PX = isMobile ? 12 : 14;
   const TARGET_TXT_W  = isMobile ? 150 : 200;
 
-  // Radio de acierto (un pelín menor para evitar snaps “por error”)
   const HIT_RADIUS  = isMobile ? 0.28 : 0.35;
 
-  /** ========================
-   *  Ítems (bloques + pedestales)
-   *  ======================== */
   const items = useMemo<Item[]>(
     () => [
       {
@@ -92,9 +78,6 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
     [X_LEFT, X_MID, X_RIGHT, Z_START, Z_TGT]
   );
 
-  /** ========================
-   *  Estado
-   *  ======================== */
   const [positions, setPositions] = useState<Record<string, [number, number, number]>>(
     () => items.reduce((acc, it) => ({ ...acc, [it.id]: it.start }), {})
   );
@@ -104,10 +87,8 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
   const [errorMsg, setErrorMsg] = useState("");
   const [showWin, setShowWin] = useState(false);
 
-  /** ========================
-   *  Drag robusto (ray ⨯ plano)
-   *  ======================== */
-  const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)); // y=0
+  // Raycast plano Y=0
+  const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const tmpVec = useRef(new THREE.Vector3()).current;
 
   const getXZFromEvent = (e: any) => {
@@ -116,7 +97,7 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
     return { x: hit.x, z: hit.z };
   };
 
-  // Limitar área de juego (para que no se vayan “muy lejos”)
+  // límites del tablero
   const CLAMP_X = isMobile ? MOBILE_SPACING + 0.6 : 3.4;
   const CLAMP_Z = isMobile ? 1.8 : 2.2;
   const clampXZ = (nx: number, nz: number) => ([
@@ -133,16 +114,13 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
   };
   const allPlaced = items.every((it) => placed(it.id));
 
-  /** ========================
-   *  Handlers
-   *  ======================== */
+  // Handlers
   function onBlockDown(id: string, e: any) {
     e.stopPropagation();
     if (showHelp || showError || showWin) return;
     setDragId(id);
     if (showHelp) setShowHelp(false);
   }
-
   function onMoveCatcher(e: any) {
     if (!dragId) return;
     e.stopPropagation();
@@ -151,7 +129,6 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
     const [cx, cz] = clampXZ(x, z);
     setPositions((prev) => ({ ...prev, [dragId!]: [cx, y, cz] }));
   }
-
   function onBlockUp(id: string, e: any) {
     e.stopPropagation();
     if (dragId !== id) return;
@@ -172,7 +149,7 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
 
   return (
     <group position={[0, isMobile ? 0.7 : 0.9, 0]} scale={[GROUP_SCALE, GROUP_SCALE, GROUP_SCALE]}>
-      {/* Plano "catcher" invisible (captura move/up fuera del bloque) */}
+      {/* catcher invisible para mover/soltar fuera del bloque */}
       <mesh
         position={[0, 0, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -183,19 +160,13 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Pedestales */}
+      {/* pedestales */}
       {items.map((it) => (
         <group key={`t-${it.id}`} position={[it.target[0], 0, it.target[2]]}>
-          {/* base */}
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[TARGET_R, 48]} />
-            <meshStandardMaterial
-              color={theme.ground}
-              emissive={theme.glowBlue}
-              emissiveIntensity={0.12}
-            />
+            <meshStandardMaterial color={theme.ground} emissive={theme.glowBlue} emissiveIntensity={0.12} />
           </mesh>
-          {/* poste decorativo */}
           <mesh position={[0, 0.1, 0]}>
             <cylinderGeometry args={[0.05, 0.05, isMobile ? 0.18 : 0.2, 16]} />
             <meshStandardMaterial
@@ -206,7 +177,6 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
               metalness={0.05}
             />
           </mesh>
-          {/* etiqueta del pedestal (más estrecha en mobile) */}
           <Html center position={[0, 0.62, 0]}>
             <div
               style={{
@@ -229,17 +199,13 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
         </group>
       ))}
 
-      {/* Bloques arrastrables */}
+      {/* bloques arrastrables */}
       {items.map((it) => {
         const p = positions[it.id];
         const ok = placed(it.id);
         return (
           <group key={it.id} position={[p[0], p[1], p[2]]}>
-            <mesh
-              onPointerDown={(e) => onBlockDown(it.id, e)}
-              onPointerUp={(e) => onBlockUp(it.id, e)}
-              castShadow
-            >
+            <mesh onPointerDown={(e) => onBlockDown(it.id, e)} onPointerUp={(e) => onBlockUp(it.id, e)} castShadow>
               <boxGeometry args={[BLOCK_SIZE, BLOCK_H, BLOCK_SIZE]} />
               <meshStandardMaterial
                 color={ok ? it.color : theme.padBlue}
@@ -249,7 +215,6 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
                 roughness={0.35}
               />
             </mesh>
-            {/* caption del bloque (más abajo y más pequeño en mobile) */}
             <Html center position={[0, CAPTION_Y, 0]}>
               <div
                 style={{
@@ -270,7 +235,7 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
         );
       })}
 
-      {/* Modal: Instrucciones */}
+      {/* Modal: Instrucciones (MP3) */}
       <Html center>
         <Modal
           open={showHelp}
@@ -280,19 +245,14 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
           primaryLabel="Comenzar"
         >
           <p>
-            Arrastra cada <b>bloque 3D</b> hasta el <b>pedestal</b> que le
-            corresponde: <em>Eficiencia académica, Compromiso del equipo, Innovación</em>.
-            Si te equivocas, te daremos una pista.
+            Arrastra cada <b>bloque 3D</b> hasta el <b>pedestal</b> que le corresponde:
+            <em> Eficiencia académica, Compromiso del equipo, Innovación</em>. Si te equivocas, te daremos una pista.
           </p>
-          <Speech
-            text="Arrastra cada bloque tridimensional hasta el pedestal que le corresponde: Eficiencia académica, Compromiso del equipo e Innovación. Si te equivocas, te daremos una pista."
-            when={showHelp}
-            lang="es-ES"
-          />
+          <AudioNarration src="/audio/25-results-help.mp3" when={showHelp} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Modal: Error */}
+      {/* Modal: Error (MP3 genérico) */}
       <Html center>
         <Modal
           open={showError}
@@ -302,15 +262,11 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
           primaryLabel="Intentar de nuevo"
         >
           <p>{errorMsg || "Ese bloque no está en su pedestal correcto."}</p>
-          <Speech
-            text={errorMsg || "Ese bloque no está en su pedestal correcto. Inténtalo de nuevo."}
-            when={showError}
-            lang="es-ES"
-          />
+          <AudioNarration src="/audio/26-results-error.mp3" when={showError} rate={1} volume={1} />
         </Modal>
       </Html>
 
-      {/* Modal: Éxito */}
+      {/* Modal: Éxito (MP3) */}
       <Html center>
         <Modal
           open={showWin || allPlaced}
@@ -319,15 +275,8 @@ const X_RIGHT = isMobile ?  MOBILE_SPACING :  2.2;
           onPrimary={onWin}
           primaryLabel="Continuar"
         >
-          <p>
-            ¡Excelente! Vinculaste correctamente los logros con sus pedestales.
-            Avancemos a la reflexión final.
-          </p>
-          <Speech
-            text="Excelente. Vinculaste correctamente los logros con sus pedestales. Avancemos a la reflexión final."
-            when={showWin || allPlaced}
-            lang="es-ES"
-          />
+          <p>¡Excelente! Vinculaste correctamente los logros con sus pedestales. Avancemos a la reflexión final.</p>
+          <AudioNarration src="/audio/27-results-success.mp3" when={showWin || allPlaced} rate={1} volume={1} />
         </Modal>
       </Html>
     </group>

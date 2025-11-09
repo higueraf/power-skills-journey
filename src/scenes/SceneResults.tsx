@@ -79,19 +79,33 @@ export default function SceneResults() {
         placeItems: "center",
       }}
     >
-      <video
-        ref={videoRef}
-        src="/videos/06-resultados.mp4"
-        playsInline
-        preload="auto"
-        style={{
-          width: "90%",
-          maxWidth: "1000px",
-          borderRadius: "20px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-          background: theme.bg,
-        }}
-      />
+      <div
+  style={{
+    width: "min(420px, 90vw)",
+    aspectRatio: "9 / 16",
+    borderRadius: "20px",
+    overflow: "hidden",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+    background: theme.bg,
+    position: "relative",
+  }}
+>
+  <video
+    ref={videoRef}
+    src="/videos/06-resultados.mp4"
+    playsInline
+    preload="auto"
+    style={{
+      width: "120%",                    // 🔍 zoom horizontal
+      height: "100%",
+      objectFit: "cover",
+         // 👈 más hacia la izquierda
+      transform: "translateX(-10%)",    // 👈 ajuste fino de recorte
+    }}
+  />
+</div>
+
+    
       <button
         onClick={handleSkip}
         style={{
