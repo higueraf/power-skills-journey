@@ -107,7 +107,7 @@ export default function SceneReflection() {
           boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
         }}
       >
-        👉 Continuar a la reflexión
+        👉 Continuar
       </button>
     </div>
   );

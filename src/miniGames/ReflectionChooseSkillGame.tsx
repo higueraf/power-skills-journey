@@ -179,7 +179,7 @@ export default function ReflectionChooseSkillGame({ onWin }: Props) {
       <Html center>
         <Modal
           open={showHelp}
-          title="Reflexión final: ¿Cuál te representa hoy?"
+          title="¿Cuál Power Skill te representa hoy?"
           onPrimary={() => setShowHelp(false)}
           type="info"
           primaryLabel="Comenzar"
