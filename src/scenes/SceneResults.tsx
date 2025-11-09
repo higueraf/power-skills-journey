@@ -8,78 +8,106 @@ import { theme } from "../theme";
 /**
  * Escena 6: Resultados
  * - Reproduce un video introductorio automáticamente (con botón para saltar).
- * - Controla volumen por JS (0.85) y desbloquea audio con la 1ª interacción.
- * - Luego muestra el minijuego con modal + speech.
- * - Fondo vivo (degradado azul–verde).
+ * - Controla volumen por JS (1.0) y desbloquea audio con la 1ª interacción.
+ * - Al entrar al juego: desmonta/limpia el video para que NO pueda sonar.
  */
 export default function SceneResults() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showGame, setShowGame] = useState(false);
 
+  // util para garantizar que el video queda "muerto"
+  const fullyStopVideo = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      v.pause();
+      // silenciar y reiniciar
+      v.muted = true;
+      v.currentTime = 0;
+      // quitar fuente para evitar reproducciones fantasma
+      const src = v.getAttribute("src");
+      if (src) v.removeAttribute("src");
+      // forzar a recargar estado vacío
+      v.load();
+    } catch {}
+  };
+
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const v = videoRef.current;
+    if (!v) return;
 
-    // Volumen deseado (0..1)
-    const TARGET_VOL = 1;
+    const TARGET_VOL = 1.0;
 
-    // Listener fin de video
     const onEnd = () => setShowGame(true);
-    video.addEventListener("ended", onEnd);
-
-    // Asegura volumen al cargar metadatos
     const onLoadedMeta = () => {
-      video.volume = TARGET_VOL;
+      v.volume = TARGET_VOL;
     };
-    video.addEventListener("loadedmetadata", onLoadedMeta);
 
-    // Desbloquear audio en la primera interacción del usuario
-    const unlockAudio = async () => {
-      try {
-        video.muted = false;
-        video.volume = TARGET_VOL;
-        await video.play();
-      } catch {
-        // Si falla, dejamos muted y que siga reproduciendo sin sonido
-      } finally {
+    v.addEventListener("ended", onEnd);
+    v.addEventListener("loadedmetadata", onLoadedMeta);
+
+    // ——— Solo desbloquear y autoplay mientras NO estamos en el juego ———
+    if (!showGame) {
+      const unlockAudio = async () => {
+        // si el video ya no está en el DOM, no hagas nada
+        if (!v || !document.body.contains(v)) return;
+        try {
+          v.muted = false;
+          v.volume = TARGET_VOL;
+          await v.play();
+        } catch {
+          // si falla, al menos que quede en mute reproduciendo (para autoplay en móvil)
+          try {
+            v.muted = true;
+            v.volume = TARGET_VOL;
+            await v.play();
+          } catch {}
+        } finally {
+          window.removeEventListener("pointerdown", unlockAudio);
+          window.removeEventListener("keydown", unlockAudio);
+        }
+      };
+
+      window.addEventListener("pointerdown", unlockAudio, { once: true });
+      window.addEventListener("keydown", unlockAudio, { once: true });
+
+      // intento de autoplay inicial
+      (async () => {
+        try {
+          v.muted = false;
+          v.volume = TARGET_VOL;
+          await v.play();
+        } catch {
+          try {
+            v.muted = true;
+            v.volume = TARGET_VOL;
+            await v.play();
+          } catch (err) {
+            console.warn("No se pudo iniciar el video automáticamente:", err);
+          }
+        }
+      })();
+
+      // cleanup parcial (cuando pase a showGame o unmount)
+      return () => {
+        v.removeEventListener("ended", onEnd);
+        v.removeEventListener("loadedmetadata", onLoadedMeta);
         window.removeEventListener("pointerdown", unlockAudio);
         window.removeEventListener("keydown", unlockAudio);
-      }
-    };
-    window.addEventListener("pointerdown", unlockAudio, { once: true });
-    window.addEventListener("keydown", unlockAudio, { once: true });
-
-    // Intento de autoplay: primero sin mute, si falla, con mute
-    (async () => {
-      try {
-        video.muted = false;
-        video.volume = TARGET_VOL;
-        await video.play();
-      } catch {
-        try {
-          video.muted = true; // autoplay más permisivo
-          video.volume = TARGET_VOL;
-          await video.play();
-        } catch (err) {
-          console.warn("No se pudo iniciar el video automáticamente:", err);
-        }
-      }
-    })();
-
-    return () => {
-      video.removeEventListener("ended", onEnd);
-      video.removeEventListener("loadedmetadata", onLoadedMeta);
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-    };
-  }, []);
+      };
+    } else {
+      // si ya estamos en el juego: detén y “desengancha” por si quedaba algo
+      fullyStopVideo();
+      return () => {
+        v.removeEventListener("ended", onEnd);
+        v.removeEventListener("loadedmetadata", onLoadedMeta);
+      };
+    }
+  }, [showGame]);
 
   const handleSkip = () => {
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
-    }
+    fullyStopVideo();
     setShowGame(true);
   };
 
@@ -97,7 +125,6 @@ export default function SceneResults() {
         <ThreeCanvas>
           <group position={[0, -0.5, 0]}>
             <Ground />
-            {/* Al ganar → reflexión final */}
             <ResultsDragMatchGame onWin={() => nav("/reflection")} />
           </group>
         </ThreeCanvas>
@@ -131,19 +158,16 @@ export default function SceneResults() {
         <video
           ref={videoRef}
           src="/videos/06-resultados.mp4"
-          // Autoplay más confiable en móviles: playsInline + muted
           playsInline
           muted
           preload="auto"
           autoPlay
-          // controls={true} // <- descomenta si quieres mostrar controles
           style={{
-            width: "120%",                 // 🔍 zoom horizontal
+            width: "120%",
             height: "100%",
             objectFit: "cover",
-            transform: "translateX(-10%)", // 👈 ajuste fino de recorte
+            transform: "translateX(-10%)",
           }}
-          // (Opcional) permite activar sonido al tocar el video
           onClick={() => {
             const v = videoRef.current;
             if (!v) return;
