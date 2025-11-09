@@ -36,7 +36,6 @@ export default function BuildSentenceGame({ onWin }: Props) {
   const vh = viewport.height;
 
   const isMobile = size.width < 640;
-  const isTablet = size.width >= 640 && size.width < 1024;
 
   // ---- Tamaños base ----
   const baseScale = isMobile ? 0.9 : 1.0;
