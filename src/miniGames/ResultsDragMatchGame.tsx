@@ -20,9 +20,7 @@ type Item = {
 export default function ResultsDragMatchGame({ onWin }: Props) {
   const { size, gl, viewport } = useThree();
   const isMobile = size.width < 640;
-  const isTablet = size.width >= 640 && size.width < 1024;
-  const isWide = !isMobile && !isTablet;
-
+  
   // Evita scroll/pinch del navegador durante drag táctil
   useEffect(() => {
     gl.domElement.style.touchAction = "none";
