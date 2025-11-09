@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type Props = {
   text: string;
@@ -8,6 +8,9 @@ type Props = {
   when?: boolean;
 };
 
+const isMobile = () =>
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 export default function Speech({
   text,
   rate = 1,
@@ -15,51 +18,94 @@ export default function Speech({
   lang = "es-ES",
   when = true,
 }: Props) {
+  const cachedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const voicesReadyRef = useRef(false);
+  const speakTimeoutRef = useRef<number | null>(null);
+
+  // Ajuste por plataforma (móviles suelen sonar más lento a igual rate)
+  const adjusted = useMemo(() => {
+    const rateAdj = isMobile() ? rate * 1.15 : rate * 0.95; // antes lo bajabas a 0.9
+    const pitchAdj = Math.min(1.1, Math.max(0.9, pitch * (isMobile() ? 1.0 : 0.95)));
+    return { rate: rateAdj, pitch: pitchAdj };
+  }, [rate, pitch]);
+
+  // Resolver y cachear voz una sola vez
   useEffect(() => {
-    if (!when || !text) return;
     const synth = window.speechSynthesis;
     if (!synth) return;
 
-    const speak = () => {
+    const pick = () => {
       const voices = synth.getVoices();
-      // intento encontrar voz de mejor calidad
-      const voice =
-        voices.find((v) =>
-          v.name?.toLowerCase().includes("neural")
-        ) ||
-        voices.find((v) => v.lang?.startsWith(lang)) ||
-        voices.find((v) => v.name?.toLowerCase().includes("spanish")) ||
+      if (!voices || voices.length === 0) return;
+
+      const v =
+        voices.find(v => v.name?.toLowerCase().includes("neural")) ||
+        voices.find(v => v.lang?.toLowerCase().startsWith(lang.toLowerCase())) ||
+        voices.find(v => v.name?.toLowerCase().includes("spanish")) ||
         voices[0];
 
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = voice?.lang || lang;
-      u.voice = voice || null;
-      // ajusto rate/pitch para sonido más natural
-      u.rate = rate * 0.9;
-      u.pitch = pitch * 0.95;
+      cachedVoiceRef.current = v || null;
+      voicesReadyRef.current = true;
 
-      try {
-        if (synth.speaking) {
-          synth.cancel();
-        }
-        synth.speak(u);
-      } catch (err) {
-        console.warn("Speech synthesis error:", err);
-      }
+      // Pre-warm tras cargar voces (silencioso) para inicializar el motor móvil
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      u.lang = v?.lang || lang;
+      u.voice = v || null;
+      synth.speak(u);
     };
 
-    if (synth.getVoices().length === 0) {
-      synth.onvoiceschanged = speak;
+    if (synth.getVoices().length > 0) {
+      pick();
     } else {
-      speak();
+      // Registrar una única vez
+      const handler = () => {
+        pick();
+        synth.onvoiceschanged = null;
+      };
+      synth.onvoiceschanged = handler;
+    }
+  }, [lang]);
+
+  // Hablar cuando cambie el texto/flags
+  useEffect(() => {
+    if (!when || !text) return;
+    const synth = window.speechSynthesis;
+    if (!synth || !voicesReadyRef.current) return;
+
+    // Debounce para evitar cancelar/hablar en el mismo tick
+    if (speakTimeoutRef.current) {
+      clearTimeout(speakTimeoutRef.current);
     }
 
-    return () => {
+    speakTimeoutRef.current = window.setTimeout(() => {
       try {
-        window.speechSynthesis.cancel();
-      } catch {}
+        if (synth.speaking || synth.pending) {
+          // Cancel y espera un micro-turno para que el motor libere recursos (móvil)
+          synth.cancel();
+        }
+
+        const u = new SpeechSynthesisUtterance(text);
+        const v = cachedVoiceRef.current;
+        u.lang = v?.lang || lang;
+        u.voice = v || null;
+        u.rate = adjusted.rate;
+        u.pitch = adjusted.pitch;
+        u.volume = 1;
+
+        // En algunos móviles es mejor dar un pequeño respiro tras cancel()
+        setTimeout(() => synth.speak(u), 0);
+      } catch (e) {
+        console.warn("Speech synthesis error:", e);
+      }
+    }, 120); // pequeño debounce
+
+    return () => {
+      if (speakTimeoutRef.current) clearTimeout(speakTimeoutRef.current);
+      // No canceles siempre al desmontar si hay otras utterances en cola compartida
+      try { if (window.speechSynthesis.speaking) window.speechSynthesis.cancel(); } catch {}
     };
-  }, [text, rate, pitch, lang, when]);
+  }, [text, when, lang, adjusted.rate, adjusted.pitch]);
 
   return null;
 }
