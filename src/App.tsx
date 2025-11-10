@@ -15,7 +15,7 @@ export default function App() {
   return (
     <>
       {/* 🎶 Música de fondo persistente */}
-      <BackgroundMusic src="/audio/bg-music.mp3" volume={0.02} />
+      <BackgroundMusic src="/audio/bg-music.mp3" volume={0.01} />
 
       <Routes>
         <Route path="/" element={<Navigate to="/welcome" replace />} />
